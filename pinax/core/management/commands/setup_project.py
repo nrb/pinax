@@ -7,6 +7,7 @@ import shutil
 import sys
 
 import pip
+from pip.vcs import vcs, get_src_requirement, import_vcs_support
 
 try:
     from pip.exceptions import InstallationError
@@ -39,6 +40,11 @@ class Command(BaseCommand):
             default = "zero",
             help = "the starter project to use as a base (excluding _project, e.g., basic or social. see --list-projects)"
         ),
+        optparse.make_option("-r", "--remote-base",
+            dest = "remote_base",
+            default = "",
+            help = "the remote starter project to use as a base (advanced)"
+        ),
         optparse.make_option("--no-reqs",
             dest = "no_reqs",
             action = "store_true",
@@ -63,6 +69,10 @@ class Command(BaseCommand):
             self.print_help("pinax-admin", "setup_project")
             sys.exit(0)
         
+        if options["remote_base"]:
+            self.setup_remote(args[0], options["remote_base"], options)
+            sys.exit(0)
+            
         self.setup_project(args[0], options["base"], options)
     
     def base_list(self):
@@ -139,29 +149,110 @@ class Command(BaseCommand):
             print
             print ("Skipping requirement installation. Run pip install --no-deps "
                 "-r requirements/project.txt inside the project directory.")
+                
+    def setup_remote(self, destination, remote_base, options):
+        
+        user_project_name = os.path.basename(destination)
+        
+        if os.path.exists(destination):
+            raise CommandError("Destination path already exists [%s]" % destination)
+        
+        try:
+            # check to see if the project_name copies an existing module name
+            __import__(user_project_name)
+        except ImportError:
+            # The module does not exist so we let Pinax create it as a project
+            pass
+        else:
+            # The module exists so we raise a CommandError and exit
+            raise CommandError(
+                "'%s' conflicts with the name of an existing Python "
+                "package/module and cannot be used as a project name. Please "
+                "try another name." % project_name
+            )
+        
+        import_vcs_support()
+        url = parse_remote(remote_base)
+        
+        installer = ProjectInstaller(None, destination, None, user_project_name, url)
+        installer.copy()
+        installer.fix_settings()
+        print "Created project %s" % user_project_name
+        if not options["no_reqs"]:
+            print "Installing project requirements..."
+            try:
+                installer.install_reqs(not options["allow_no_virtualenv"])
+            except InstallationError:
+                print ("Installation of requirements failed. The project %s "
+                    "has been created though.") % user_project_name
+        else:
+            print
+            print ("Skipping requirement installation. Run pip install --no-deps "
+                "-r requirements/project.txt inside the project directory.")
+        
+def parse_remote(remote_base, default_vcs=None):
+    """Parses svn+http://blahblah@rev#egg=Foobar into a requirement
+    (Foobar) and a URL, riped from pip"""
+    url = remote_base
+    if os.path.isdir(url) and os.path.exists(os.path.join(url, 'setup.py')):
+        # Treating it as code that has already been checked out
+        url = path_to_url(url)
+    if url.lower().startswith('file:'):
+        return None, url
+    for version_control in vcs:
+        if url.lower().startswith('%s:' % version_control):
+            url = '%s+%s' % (version_control, url)
+    if '+' not in url:
+        if default_vcs:
+            url = default_vcs + '+' + url
+        else:
+            raise InstallationError(
+                '--remote-base=%s should be formatted with svn+URL, git+URL, hg+URL or bzr+URL' % remote_base)
+    vc_type = url.split('+', 1)[0].lower()
+    if not vcs.get_backend(vc_type):
+        raise InstallationError(
+            'For --remote-base=%s only svn (svn+URL), Git (git+URL), Mercurial (hg+URL) and Bazaar (bzr+URL) is currently supported' % remote_base)
 
+    return url
 
 class ProjectInstaller(object):
     """
     Provides the methods to install a project at a given destination
     """
     
-    def __init__(self, source_dir, project_dir, project_name, user_project_name):
+    def __init__(self, source_dir, project_dir, project_name, user_project_name, url=None):
         self.source_dir = source_dir
         self.project_dir = project_dir
         self.project_name = project_name
         self.user_project_name = user_project_name
+        self.url = url
     
     def generate_secret_key(self):
         chars = "abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)"
         return "".join([random.choice(chars) for i in xrange(50)])
     
-    def copy(self):
-        copytree(self.source_dir, self.project_dir,
-            excluded_patterns=[
-                ".svn", ".pyc", "dev.db"
-            ]
-        )
+    def copy(self, obtain=True):
+        if not self.url:
+            copytree(self.source_dir, self.project_dir,
+                excluded_patterns=[
+                    ".svn", ".pyc", "dev.db"
+                ]
+            )
+        else:
+            vc_type, url = self.url.split('+', 1)
+            split = self.url.rsplit('/',1)
+            if len(split) == 1:
+                split = self.url.rsplit(':',1)
+            project_name = split[-1]
+            
+            self.project_name = re.sub(r'(\.git|\.svn|\.bzr|\.hg)$','',project_name)
+            backend = vcs.get_backend(vc_type)
+            if backend:
+                vcs_ = backend(self.url)
+                if obtain:
+                    vcs_.obtain(self.project_dir)
+                else:
+                    vcs_.export(self.project_dir)
     
     def fix_settings(self):
         # @@@ settings refactor
