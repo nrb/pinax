@@ -7,7 +7,7 @@ import shutil
 import sys
 
 import pip
-from pip.vcs import vcs, get_src_requirement, import_vcs_support
+from pip.vcs import vcs, import_vcs_support
 
 try:
     from pip.exceptions import InstallationError
