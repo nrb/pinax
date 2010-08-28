@@ -191,27 +191,29 @@ class Command(BaseCommand):
                 "-r requirements/project.txt inside the project directory.")
         
 def parse_remote(remote_base, default_vcs=None):
-    """Parses svn+http://blahblah@rev#egg=Foobar into a requirement
-    (Foobar) and a URL, riped from pip"""
+    """
+    Parses vcs+http://blahblah@rev into a requirement
+    (Foobar) from a URL, riped from pip
+    """
     url = remote_base
-    if os.path.isdir(url) and os.path.exists(os.path.join(url, 'setup.py')):
+    if os.path.isdir(url) and os.path.exists(os.path.join(url, "setup.py")):
         # Treating it as code that has already been checked out
         url = path_to_url(url)
-    if url.lower().startswith('file:'):
+    if url.lower().startswith("file:"):
         return None, url
     for version_control in vcs:
-        if url.lower().startswith('%s:' % version_control):
-            url = '%s+%s' % (version_control, url)
-    if '+' not in url:
+        if url.lower().startswith("%s:" % version_control):
+            url = "%s+%s" % (version_control, url)
+    if "+" not in url:
         if default_vcs:
-            url = default_vcs + '+' + url
+            url = default_vcs + "+" + url
         else:
             raise InstallationError(
-                '--remote-base=%s should be formatted with svn+URL, git+URL, hg+URL or bzr+URL' % remote_base)
-    vc_type = url.split('+', 1)[0].lower()
+                "--remote-base=%s should be formatted with svn+URL, git+URL, hg+URL or bzr+URL" % remote_base)
+    vc_type = url.split("+", 1)[0].lower()
     if not vcs.get_backend(vc_type):
         raise InstallationError(
-            'For --remote-base=%s only svn (svn+URL), Git (git+URL), Mercurial (hg+URL) and Bazaar (bzr+URL) is currently supported' % remote_base)
+            "For --remote-base=%s only svn (svn+URL), Git (git+URL), Mercurial (hg+URL) and Bazaar (bzr+URL) is currently supported" % remote_base)
 
     return url
 
@@ -239,13 +241,13 @@ class ProjectInstaller(object):
                 ]
             )
         else:
-            vc_type, url = self.url.split('+', 1)
-            split = self.url.rsplit('/',1)
+            vc_type, url = self.url.split("+", 1)
+            split = self.url.rsplit("/",1)
             if len(split) == 1:
-                split = self.url.rsplit(':',1)
+                split = self.url.rsplit(":",1)
             project_name = split[-1]
             
-            self.project_name = re.sub(r'(\.git|\.svn|\.bzr|\.hg)$','',project_name)
+            self.project_name = re.sub(r"(\.git|\.svn|\.bzr|\.hg)$","",project_name)
             backend = vcs.get_backend(vc_type)
             if backend:
                 vcs_ = backend(self.url)
