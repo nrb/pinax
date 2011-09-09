@@ -113,15 +113,9 @@ class Command(BaseCommand):
         # allow repos and such)
         if base in [p.replace("_project", "") for p in self.project_list()]:
             project_name = "%s_project" % base
-            source = os.path.join(PROJECTS_DIR, project_name)
+            source = "file+file://%s" % os.path.join(PROJECTS_DIR, project_name)
         else:
-            if not os.path.exists(base):
-                raise CommandError(
-                    "Project template does not exist the given "
-                    "path: %s" % base
-                )
-            else:
-                project_name = os.path.basename(base)
+            source = source
         
         installer = ProjectInstaller(source, destination, project_name, user_project_name)
         installer.copy()
@@ -146,22 +140,51 @@ class ProjectInstaller(object):
     Provides the methods to install a project at a given destination
     """
     
-    def __init__(self, source_dir, project_dir, project_name, user_project_name):
-        self.source_dir = source_dir
+    @classmethod
+    def clean_source(cls, source):
+        if os.path.exists(source):
+            kind, url = "file", source
+        else:
+            kind, url = source.split("+", 1)
+        parsed = urlparse.urlparse(url)
+        
+        if kind not in ["file", "git", "hg"]:
+            raise CommandError("project base is invalid")
+        
+        if kind == "file":
+            source = "file://%s" % os.path.expanduser(base)
+            project_name = os.path.basename(base)
+        
+        print source
+        raise Exception
+    
+    def __init__(self, source, project_dir, project_name, user_project_name):
+        self.source = self.parse_source(source)
         self.project_dir = project_dir
         self.project_name = project_name
         self.user_project_name = user_project_name
+    
+    def parse_source(self, source):
+        kind, url = source.split("+", 1)
+        return kind, urlparse.urlparse(url)
     
     def generate_secret_key(self):
         chars = "abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)"
         return "".join([random.choice(chars) for i in xrange(50)])
     
     def copy(self):
-        copytree(self.source_dir, self.project_dir,
-            excluded_patterns=[
-                ".svn", ".pyc", "dev.db"
-            ]
-        )
+        if self.source[0] == "git":
+            raise NotImplementedError("no git!")
+        elif self.source[0] == "hg":
+            raise NotImplementedError("no hg!")
+        elif self.source[0] == "file":
+            copytree(self.source.path, self.project_dir,
+                excluded_patterns=[
+                    ".svn", ".pyc", "dev.db"
+                ]
+            )
+        else:
+            raise Exception("unsupported kind")
     
     def fix_settings(self):
         # @@@ settings refactor
