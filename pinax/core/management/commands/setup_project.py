@@ -6,8 +6,9 @@ import re
 import shutil
 import sys
 
-import pip
-from pip.vcs import vcs, import_vcs_support
+from pip.req import InstallRequirement, RequirementSet
+from pip.index import PackageFinder
+from pip.locations import build_prefix, src_prefix
 
 try:
     from pip.exceptions import InstallationError
@@ -171,7 +172,6 @@ class Command(BaseCommand):
                 "try another name." % project_name
             )
         
-        import_vcs_support()
         url = parse_remote(remote_base)
         
         installer = ProjectInstaller(None, destination, None, user_project_name, url)
