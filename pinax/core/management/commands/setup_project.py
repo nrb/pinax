@@ -5,8 +5,13 @@ import random
 import re
 import shutil
 import sys
+import urlparse
 
 import pip
+from pip.index import PackageFinder
+from pip.locations import build_prefix, src_prefix
+from pip.req import InstallRequirement, RequirementSet
+from pip.vcs import vcs
 
 try:
     from pip.exceptions import InstallationError
@@ -115,7 +120,9 @@ class Command(BaseCommand):
             project_name = "%s_project" % base
             source = "file+file://%s" % os.path.join(PROJECTS_DIR, project_name)
         else:
-            source = source
+            project_name = base
+            source = base
+
         
         installer = ProjectInstaller(source, destination, project_name, user_project_name)
         installer.copy()
@@ -163,6 +170,10 @@ class ProjectInstaller(object):
         self.project_dir = project_dir
         self.project_name = project_name
         self.user_project_name = user_project_name
+        
+        if self.source[0] in ["git", "hg"]:
+            # Extract the name of the installed egg from the provided URL.
+            self.egg_name = source.rsplit("#egg=", 1)[1]
     
     def parse_source(self, source):
         kind, url = source.split("+", 1)
@@ -173,10 +184,42 @@ class ProjectInstaller(object):
         return "".join([random.choice(chars) for i in xrange(50)])
     
     def copy(self):
-        if self.source[0] == "git":
-            raise NotImplementedError("no git!")
-        elif self.source[0] == "hg":
-            raise NotImplementedError("no hg!")
+        if self.source[0] in ["git", "hg"]:
+            # Let pip import version control information.
+            pip.version_control()
+            
+            reqset = RequirementSet(
+                build_dir=build_prefix,
+                src_dir=src_prefix,
+                download_dir=None
+            )
+            
+            # Let pip do all the heavy lifting for VCS-based packages.
+            req = InstallRequirement.from_editable(
+                self.source[1].geturl(),
+                default_vcs=self.source[0]
+            )
+            reqset.add_requirement(req)
+            
+            finder = PackageFinder(find_links=[], index_urls=[])
+            
+            reqset.prepare_files(finder)
+            reqset.install(install_options=[], global_options=[])
+            reqset.cleanup_files()
+            
+            # Try to build a path to the newly installed package.
+            installed_path = os.path.join(src_prefix, self.egg_name, self.egg_name)
+            
+            # A bit of a hack, but most commonly package names replace dashes with underscores.
+            if not os.path.exists(installed_path):
+                package_name = self.egg_name.replace("-", "_")
+                installed_path = os.path.join(src_prefix, self.egg_name, package_name)
+            
+            copytree(installed_path, self.project_dir,
+                excluded_patterns=[
+                    ".git", ".gitignore", ".hg", ".hgignore", ".pyc", "dev.db"
+                ]
+            )
         elif self.source[0] == "file":
             copytree(self.source.path, self.project_dir,
                 excluded_patterns=[
