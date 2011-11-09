@@ -120,7 +120,7 @@ class Command(BaseCommand):
             project_name = "%s_project" % base
             source = "file+file://%s" % os.path.join(PROJECTS_DIR, project_name)
         else:
-            project_name = base
+            project_name = user_project_name
             source = base
 
         
@@ -161,7 +161,6 @@ class ProjectInstaller(object):
         if kind == "file":
             source = os.path.abspath(source)
         
-        print source
         return kind, source
     
     def __init__(self, source, project_dir, project_name, user_project_name):
@@ -195,8 +194,8 @@ class ProjectInstaller(object):
             
             # Let pip do all the heavy lifting for VCS-based packages.
             req = InstallRequirement.from_editable(
-                self.source[1].geturl(),
-                default_vcs=self.source[0]
+                self.source.geturl(),
+                default_vcs=self.kind
             )
             reqset.add_requirement(req)
             
