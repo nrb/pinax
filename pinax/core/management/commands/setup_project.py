@@ -153,25 +153,24 @@ class ProjectInstaller(object):
             kind, url = "file", source
         else:
             kind, url = source.split("+", 1)
-        parsed = urlparse.urlparse(url)
+            source = urlparse.urlparse(url)
         
         if kind not in ["file", "git", "hg"]:
             raise CommandError("project base is invalid")
         
         if kind == "file":
-            source = "file://%s" % os.path.expanduser(base)
-            project_name = os.path.basename(base)
+            source = os.path.abspath(source)
         
         print source
-        raise Exception
+        return kind, source
     
     def __init__(self, source, project_dir, project_name, user_project_name):
-        self.source = self.parse_source(source)
-        self.project_dir = project_dir
+        self.kind, self.source = self.clean_source(source)
+        self.project_dir = os.path.join(os.getcwd(), project_dir)
         self.project_name = project_name
         self.user_project_name = user_project_name
         
-        if self.source[0] in ["git", "hg"]:
+        if self.kind in ["git", "hg"]:
             # Extract the name of the installed egg from the provided URL.
             self.egg_name = source.rsplit("#egg=", 1)[1]
     
@@ -184,7 +183,7 @@ class ProjectInstaller(object):
         return "".join([random.choice(chars) for i in xrange(50)])
     
     def copy(self):
-        if self.source[0] in ["git", "hg"]:
+        if self.kind in ["git", "hg"]:
             # Let pip import version control information.
             pip.version_control()
             
@@ -220,8 +219,8 @@ class ProjectInstaller(object):
                     ".git", ".gitignore", ".hg", ".hgignore", ".pyc", "dev.db"
                 ]
             )
-        elif self.source[0] == "file":
-            copytree(self.source.path, self.project_dir,
+        elif self.kind == "file":
+            copytree(self.source, self.project_dir,
                 excluded_patterns=[
                     ".svn", ".pyc", "dev.db"
                 ]
