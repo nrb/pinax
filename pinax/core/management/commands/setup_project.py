@@ -37,12 +37,12 @@ class Command(BaseCommand):
         optparse.make_option("-l", "--list-bases",
             dest = "list_bases",
             action = "store_true",
-            help = "lists the starter projects (bases) that are available"
+            help = "lists the bundled starter projects (bases) that are available"
         ),
         optparse.make_option("-b", "--base",
             dest = "base",
             default = "zero",
-            help = "the starter project to use as a base (excluding _project, e.g., basic or social. see --list-projects)"
+            help = "the starter project to use as a base (excluding _project, e.g., basic or social. see --list-projects for included starter projects).  Valid git/hg PIP editable strings and plain file paths are accepted, as well."
         ),
         optparse.make_option("--no-reqs",
             dest = "no_reqs",

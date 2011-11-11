@@ -156,3 +156,14 @@ the Django templating language. It uses ``pinax.views.static_view`` mounted
 at ``/``. For example if you access ``/test.html`` it will render
 ``templates/test.html``. Directory paths, i.e., ``/a/``, will render
 ``/templates/a/index.html``.
+
+External Starter Projects
+=========================
+
+The Pinax ``setup_project`` command can also use starter projects built by third parties. 
+These can either be plain directory structures, or they may be a git/hg pip editable.
+
+To install a starter project from an external source, simply pass the file path or git/hg 
+URL to the ``-b`` option::
+
+    pinax-admin setup_project -b git+git://github.com/user/project.git#egg=project my_new_project
